@@ -1,7 +1,11 @@
-import { Flex, Spinner,Text } from "@chakra-ui/react";
+import { Flex, Spinner, Text } from "@chakra-ui/react";
 import { Routes, Route } from "react-router-dom";
 import { useState, useEffect } from "react";
 import Home from "./Components/Home";
+import AuthPage from "./Components/Auth";
+import AuthSuccess from "./Components/AuthSuccess";
+import ResetPassword from "./Components/resetpassword";
+import AdminDashboard from "./Components/AdminDashboard";
 
 function AppContent() {
   const [loading, setLoading] = useState(true);
@@ -26,10 +30,9 @@ function AppContent() {
           thickness="4px"
           speed="0.85s"
           emptyColor="gray.200"
-          color="#6b8f3f"           // matches your brand green from earlier menu
-          size="xl"                 // xl = quite visible but not overwhelming
+          color="#6b8f3f"
+          size="xl"
         />
-        {/* Optional: add friendly loading text */}
         <Text fontSize="lg" color="gray.600" fontWeight="medium">
           Preparing your healthy meals...
         </Text>
@@ -40,7 +43,10 @@ function AppContent() {
   return (
     <Routes>
       <Route path="/" element={<Home />} />
-      {/* Add more routes later if needed */}
+      <Route path="/auth" element={<AuthPage />} />
+      <Route path="/auth/success" element={<AuthSuccess />} />
+      <Route path="/reset-password" element={<ResetPassword />} />
+      <Route path="/admin" element={<AdminDashboard />} />
     </Routes>
   );
 }

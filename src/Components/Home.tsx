@@ -9,465 +9,388 @@ import {
   SimpleGrid,
   Text,
   VStack,
-  Collapse,
+  // Collapse,
   useDisclosure,
-  // Link,
+  Skeleton,
+  SkeletonText,
+  Icon,
+  IconButton,
+  Flex,
+  useToast,
+  // keyframes,
 } from "@chakra-ui/react";
+import { useNavigate } from "react-router-dom";
+import { useState, useEffect, useCallback } from "react";
 import Header from "./shared/header";
 import Footer from "./shared/footer";
-import { Link } from "react-router-dom";
+import { FaLeaf, FaRegCalendar, FaSyncAlt } from "react-icons/fa";
+import { FaTruckFast } from "react-icons/fa6";
+import { MOCK_MEALS, type Meal } from "../data/mockMeals";
 
-import { FaRegCalendar, FaTruckFast, FaClock } from "react-icons/fa6";export default function HomePage() {
-  const { isOpen, onToggle } = useDisclosure();
+// ─── Constants ────────────────────────────────────────────────────────────────
+const API_BASE_URL = "http://localhost:5000/api";
+
+// ─── Animations ───────────────────────────────────────────────────────────────
+// const spin = keyframes`
+//   from { transform: rotate(0deg); }
+//   to { transform: rotate(360deg); }
+// `;
+
+// ─── Meal Skeleton (Loading State) ────────────────────────────────────────────
+function MealSkeleton() {
   return (
-    <Box w="100%" overflowX="hidden">
-      <Header />
-      {/* HERO */}
-      <Box bg="#6b8f3f" color="white" position="relative" overflow="hidden">
-        <Container
-          maxW="100%"
-          px={{ base: 6, md: 20 }}
-          py={{ base: 12, md: 20 }}
+    <Box bg="white" rounded="2xl" shadow="md" p={4}>
+      <Skeleton h="200px" rounded="2xl" mb={3} />
+      <Skeleton h="20px" w="70%" mb={2} />
+      <SkeletonText noOfLines={2} spacing={2} mb={3} />
+      <Skeleton h="24px" w="30%" mb={3} />
+      <Skeleton h="40px" rounded="full" />
+    </Box>
+  );
+}
+
+// ─── Reusable meal card ───────────────────────────────────────────────────────
+function MealCard({ title, content, price, img }: Meal) {
+  const displayPrice = typeof price === "number" ? `$${price.toFixed(2)}` : price;
+  return (
+    <Box 
+      bg="white" 
+      rounded="2xl" 
+      shadow="md" 
+      p={4} 
+      transition="all 0.3s" 
+      _hover={{ transform: "translateY(-6px)", shadow: "xl" }}
+    >
+      <Image
+        src={img}
+        alt={title}
+        rounded="2xl"
+        w="100%"
+        h="200px"
+        objectFit="cover"
+        mb={3}
+        fallback={<Skeleton h="200px" rounded="2xl" />}
+      />
+      <Heading size="md" textAlign="center" mb={2} noOfLines={1}>
+        {title}
+      </Heading>
+      <Text color="gray.600" mb={3} noOfLines={2} fontSize="sm">
+        {content}
+      </Text>
+      <Text fontWeight="bold" color="#6b8f3f" mb={3}>
+        {displayPrice}
+      </Text>
+      <Button
+        w="full"
+        bg="#f2b233"
+        color="white"
+        rounded="full"
+        _hover={{ bg: "#e2a324" }}
+      >
+        Order Now
+      </Button>
+    </Box>
+  );
+}
+
+// ─── Category Filter Component ────────────────────────────────────────────────
+const categories = [
+  { id: "all", label: "All Menu" },
+  { id: "popular", label: "Popular" },
+  { id: "vegan", label: "Vegan" },
+  { id: "meat", label: "Meat" },
+  { id: "seafood", label: "Seafood" },
+];
+
+function CategoryFilter({ active, onChange, isDisabled }: { active: string; onChange: (id: string) => void; isDisabled?: boolean }) {
+  return (
+    <HStack 
+      spacing={3} 
+      overflowX="auto" 
+      pb={4} 
+      w="full" 
+      justify={{ base: "start", md: "center" }} 
+      px={4} 
+      sx={{ "&::-webkit-scrollbar": { display: "none" } }}
+    >
+      {categories.map((cat) => (
+        <Button
+          key={cat.id}
+          size="sm"
+          variant={active === cat.id ? "solid" : "outline"}
+          bg={active === cat.id ? "#6b8f3f" : "transparent"}
+          color={active === cat.id ? "white" : "gray.600"}
+          borderColor={active === cat.id ? "#6b8f3f" : "gray.200"}
+          px={6}
+          rounded="full"
+          onClick={() => onChange(cat.id)}
+          isDisabled={isDisabled}
+          _hover={{ 
+            borderColor: "#6b8f3f", 
+            color: active === cat.id ? "white" : "#6b8f3f",
+            bg: active === cat.id ? "#5a7a34" : "whiteAlpha.500" 
+          }}
+          _active={{ bg: active === cat.id ? "#4a6a24" : "gray.100" }}
+          whiteSpace="nowrap"
+          fontWeight="semibold"
         >
-          <Grid
-            templateColumns={{ base: "1fr", md: "1fr 1fr" }}
-            gap={{ base: 10, md: 16 }}
-            alignItems="center"
-          >
-            {/* Text */}
+          {cat.label}
+        </Button>
+      ))}
+    </HStack>
+  );
+}
+
+// ─── Wave helper ─────────────
+type WaveProps = {
+  d: string;
+  fill: string;
+  position?: "bottom" | "top";
+  height?: string;
+};
+
+function Wave({ d, fill, position = "bottom", height = "120px" }: WaveProps) {
+  const isBottom = position === "bottom";
+  return (
+    <Box
+      position="absolute"
+      {...(isBottom ? { bottom: 0 } : { top: 0 })}
+      left={0}
+      w="100%"
+      overflow="hidden"
+      lineHeight={0}
+      h={height}
+      pointerEvents="none"
+    >
+      <svg
+        viewBox={`0 0 1440 ${parseInt(height)}`}
+        preserveAspectRatio="none"
+        style={{ width: "100%", height: "100%" }}
+      >
+        <path d={d} fill={fill} />
+      </svg>
+    </Box>
+  );
+}
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
+export default function HomePage() {
+  const [meals, setMeals] = useState<Meal[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [activeCategory, setActiveCategory] = useState("all");
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const { isOpen, onToggle } = useDisclosure();
+  const navigate = useNavigate();
+  const toast = useToast();
+
+  const fetchMeals = useCallback(async (cat: string, isShuffle = false) => {
+    setLoading(true);
+    try {
+      // API call to backend (matches the Admin endpoint pattern)
+      const url = `${API_BASE_URL}/meals?category=${cat === "all" ? "" : cat}${isShuffle ? "&shuffle=true" : ""}`;
+      const res = await fetch(url);
+      
+      if (!res.ok) throw new Error("API Offline");
+      
+      const data = await res.json();
+      setMeals(data);
+    } catch (err) {
+      console.warn("Falling back to local data. Error:", err);
+      // Simulate backend behavior with local mock data
+      setTimeout(() => {
+        let processed = isShuffle ? [...MOCK_MEALS].sort(() => Math.random() - 0.5) : MOCK_MEALS;
+        if (cat !== "all") {
+          processed = processed.filter(m => 
+            (m.category === cat) || 
+            m.title.toLowerCase().includes(cat.toLowerCase())
+          );
+        }
+        
+        setMeals(processed.slice(0, 8));
+        setLoading(false);
+      }, 600);
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchMeals(activeCategory);
+  }, [activeCategory, fetchMeals]);
+
+  const handleRefresh = () => {
+    setIsRefreshing(true);
+    fetchMeals(activeCategory, true);
+    toast({
+      title: "Menu Updated",
+      description: "Fetching new meal inspirations for you.",
+      status: "success",
+      duration: 2000,
+      isClosable: true,
+      position: "top-right",
+    });
+  };
+
+  return (
+    <Box w="100%">
+      <Header />
+
+      {/* ── HERO ── */}
+      <Box bg="#6b8f3f" color="white" position="relative" overflow="hidden">
+        <Container maxW="100%" px={{ base: 6, md: 20 }} py={{ base: 12, md: 20 }}>
+          <Grid templateColumns={{ base: "1fr", md: "1fr 1fr" }} gap={{ base: 10, md: 16 }} alignItems="center">
             <VStack align="start" spacing={5}>
-              <Heading
-                fontSize={{ base: "3xl", md: "6xl" }}
-                fontWeight="bold"
-                lineHeight="short"
-              >
-                Eat Healthy,
-                <br />
-                Live Better
+              <Heading fontSize={{ base: "3xl", md: "6xl" }} fontWeight="bold" lineHeight="short">
+                Eat Healthy, <br /> Live Better
               </Heading>
               <Text fontSize={{ base: "md", md: "2xl" }} maxW="md">
-                Delicious and nutritious meals delivered right to your door.
+                Nutritionist-crafted meals delivered fresh to your door.
               </Text>
               <HStack spacing={4}>
-                <Button
-                  bg="#f2b233"
-                  color="white"
-                  size="lg"
-                  rounded="md"
-                  _hover={{ bg: "#e2a324" }}
-                >
+                <Button bg="#f2b233" color="white" size="lg" rounded="md" _hover={{ bg: "#e2a324" }} onClick={() => navigate("/auth")}>
                   Get Started
                 </Button>
-
-                <Button
-                  as={Link}
-                  to="#meal"
-                  variant="outline"
-                  borderColor="white"
-                  color="white"
-                  size="lg"
-                  cursor={"pointer"}
-                  rounded="md"
-                  _hover={{ bg: "whiteAlpha.200" }}
-                >
+                <Button as="a" href="#meals" variant="outline" borderColor="white" color="white" size="lg" rounded="md" _hover={{ bg: "whiteAlpha.200" }}>
                   View Menu
                 </Button>
               </HStack>
             </VStack>
-
-            {/* Hero Image */}
-            <Image
-              src="https://images.unsplash.com/photo-1546069901-eacef0df6022?q=80&w=1200&auto=format&fit=crop"
-              alt="Healthy meal"
-              rounded="2xl"
-              w="100%"
-              maxH={{ base: "300px", md: "500px" }}
-              objectFit="cover"
+            <Image 
+              src="https://images.unsplash.com/photo-1546069901-eacef0df6022?q=80&w=1200&auto=format&fit=crop" 
+              alt="Healthy meal" 
+              rounded="2xl" 
+              w="100%" 
+              maxH={{ base: "300px", md: "500px" }} 
+              objectFit="cover" 
             />
           </Grid>
         </Container>
-
-        {/* Hero → Features Wave */}
-        <Box
-          position="absolute"
-          bottom={0}
-          left={0}
-          w="100%"
-          overflow="hidden"
-          lineHeight={0}
-          h="120px"
-        >
-          <svg
-            viewBox="0 0 1440 120"
-            preserveAspectRatio="none"
-            style={{ width: "100%", height: "100%" }}
-          >
-            <path
-              d="M0,40 C360,90 1080,-30 1440,50 L1440,120 L0,120 Z"
-              fill="#fbfaf7"
-            />
-          </svg>
-        </Box>
+        <Wave d="M0,40 C360,90 1080,-30 1440,50 L1440,120 L0,120 Z" fill="#fbfaf7" />
       </Box>
 
-      {/* FEATURES */}
-      <Box
-        id="features"
-        bg="#fbfaf7"
-        py={{ base: 16, md: 0 }} // more top/bottom space on mobile
-        position="relative"
-        overflow="hidden"
-      >
-        <Container
-          maxW="7xl"
-          px={{ base: 6, md: 20 }}
-          pb={{ base: 24, md: 2 }} // generous bottom padding – prevents cut-off
-        >
-          <SimpleGrid
-            columns={{ base: 1, md: 3 }}
-            spacing={{ base: 12, md: 16 }}
-            mb={{ base: 20, md: 24 }} // extra margin below grid
-          >
-{/* Feature 1: Fresh Ingredients */}
-<VStack
-  spacing={5}
-  align={{ base: "center", md: "start" }}
-  textAlign={{ base: "center", md: "start" }}
->
-  <FaTruckFast size={48} color="#6b8f3f" />
-  <Heading size="md">Fresh Ingredients</Heading>
-  <Text color="gray.600" maxW="sm">
-    We use only the freshest, high-quality ingredients in every meal.
-  </Text>
-</VStack>
-
-{/* Feature 2: Flexible Plans */}
-<VStack
-  spacing={5}
-  align={{ base: "center", md: "start" }}
-  textAlign={{ base: "center", md: "start" }}
->
-  <FaRegCalendar size={48} color="#6b8f3f" />
-  <Heading size="md">Flexible Plans</Heading>
-  <Text color="gray.600" maxW="sm">
-    Choose a meal plan that fits your lifestyle — cancel anytime.
-  </Text>
-</VStack>
-
-{/* Feature 3: Fast Delivery */}
-<VStack
-  spacing={5}
-  align={{ base: "center", md: "start" }}
-  textAlign={{ base: "center", md: "start" }}
->
-  <FaClock size={48} color="#6b8f3f" />
-  <Heading size="md">Fast Delivery</Heading>
-  <Text color="gray.600" maxW="sm">
-    Enjoy quick and reliable meal delivery to your doorstep.
-  </Text>
-</VStack>
+      {/* ── FEATURES ── */}
+      <Box id="features" bg="#fbfaf7" py={{ base: 16, md: 20 }} position="relative">
+        <Container maxW="7xl" px={{ base: 6, md: 20 }} pb={{ base: 24, md: 20 }}>
+          <SimpleGrid columns={{ base: 1, md: 3 }} spacing={{ base: 12, md: 16 }}>
+            <VStack spacing={5} align={{ base: "center", md: "start" }} textAlign={{ base: "center", md: "start" }}>
+              <Icon as={FaLeaf} boxSize={12} color="#6b8f3f" />
+              <Heading size="md">Fresh Ingredients</Heading>
+              <Text color="gray.600">Only the freshest, high-quality ingredients in every meal.</Text>
+            </VStack>
+            <VStack spacing={5} align={{ base: "center", md: "start" }} textAlign={{ base: "center", md: "start" }}>
+              <Icon as={FaRegCalendar} boxSize={12} color="#6b8f3f" />
+              <Heading size="md">Flexible Plans</Heading>
+              <Text color="gray.600">Choose a plan that fits your lifestyle — cancel anytime.</Text>
+            </VStack>
+            <VStack spacing={5} align={{ base: "center", md: "start" }} textAlign={{ base: "center", md: "start" }}>
+              <Icon as={FaTruckFast} boxSize={12} color="#6b8f3f" />
+              <Heading size="md">Fast Delivery</Heading>
+              <Text color="gray.600">Enjoy quick and reliable delivery right to your doorstep.</Text>
+            </VStack>
           </SimpleGrid>
-
-          {/* Wave – taller & smoother on mobile */}
-          <Box
-            position="absolute"
-            bottom={0}
-            left={0}
-            width="100%"
-            height={{ base: "160px", md: "140px" }} // even taller on small screens
-            overflow="hidden"
-            lineHeight={0}
-          >
-            <svg
-              viewBox="0 0 1440 180"
-              preserveAspectRatio="none"
-              style={{ display: "block", width: "100%", height: "100%" }}
-            >
-              <path
-                d="M0,80 C480,0 960,160 1440,80 L1440,180 L0,180 Z"
-                fill="#f6f3ee"
-              />
-            </svg>
-          </Box>
         </Container>
+        <Wave d="M0,80 C480,0 960,160 1440,80 L1440,180 L0,180 Z" fill="#f6f3ee" height="160px" />
       </Box>
 
-      {/* ABOUT */}
-      <Box id="about" bg="#f6f3ee" position="relative">
+      {/* ── ABOUT ── */}
+      <Box id="about" bg="#f6f3ee" position="relative" pb="120px">
         <Container maxW="7xl" py={20}>
-          <Grid
-            templateColumns={{ base: "1fr", md: "1fr 1fr" }}
-            gap={12}
-            alignItems="center"
-          >
-            {/* About Image */}
-            <Image
-              src="woman.png"
-              alt="Woman preparing healthy meal"
-              rounded="2xl"
-              w="100%"
-              maxH={{ base: "250px", md: "400px" }}
-              objectFit="cover"
-            />
-
-            {/* About Text */}
-            <VStack align="start" spacing={4}>
+          <Grid templateColumns={{ base: "1fr", md: "1fr 1fr" }} gap={12} alignItems="center">
+            <Image src="woman.png" alt="Healthy eating" rounded="2xl" w="100%" maxH="400px" objectFit="cover" />
+            <VStack align="start" spacing={6}>
               <Heading>Healthy Eating Made Easy</Heading>
               <Text color="gray.600">
-                At HealthyBite, we believe that eating healthy should be simple
-                and convenient. Our meals are crafted by professional
-                nutritionists and chefs to ensure you get a balanced diet
-                without the hassle of cooking.
+                Crafted by professional nutritionists and chefs to ensure you get a balanced diet without the hassle of cooking.
               </Text>
-              <VStack align="start" spacing={2}>
-                <Text>✔ Nutritionist-approved meals</Text>
-                <Text>✔ Affordable plans for everyone</Text>
-                <Text>✔ No cooking or cleaning required</Text>
+              <VStack align="start" spacing={3}>
+                <HStack><Icon as={FaLeaf} color="#6b8f3f" /><Text>Nutritionist-approved meals</Text></HStack>
+                <HStack><Icon as={FaLeaf} color="#6b8f3f" /><Text>Affordable plans for everyone</Text></HStack>
+                <HStack><Icon as={FaLeaf} color="#6b8f3f" /><Text>No cooking or cleaning required</Text></HStack>
               </VStack>
-              <Button bg="#6b8f3f" color="white" rounded="full" px={8}>
+              <Button bg="#6b8f3f" color="white" rounded="full" px={8} _hover={{ bg: "#5a7a34" }}>
                 Learn More
               </Button>
             </VStack>
           </Grid>
-
-          {/* About → Meals Wave */}
-          <Box
-            position="absolute"
-            bottom={0}
-            left={0}
-            w="100%"
-            overflow="hidden"
-            lineHeight={0}
-            h="120px"
-          >
-            <svg
-              viewBox="0 0 1440 120"
-              preserveAspectRatio="none"
-              style={{ width: "100%", height: "100%" }}
-            >
-              <path
-                d="M0,40 C360,80 1080,0 1440,60 L1440,120 L0,120 Z"
-                fill="#fbfaf7"
-              />
-            </svg>
-          </Box>
         </Container>
+        <Wave d="M0,40 C360,80 1080,0 1440,60 L1440,120 L0,120 Z" fill="#fbfaf7" />
       </Box>
 
-      <Box
-        id="meals"
-        // bg="#fbfaf7"
-        py={20}
-        position="relative"
-        overflow="hidden"
-      >
-        {/* Curved top wave – decorative, same color family */}
-        <Box
-          position="absolute"
-          top={0}
-          left={0}
-          w="100%"
-          h={{ base: "80px", md: "150px" }}
-          overflow="hidden"
-          pointerEvents="none"
-          zIndex={1}
-        >
-          <svg
-            viewBox="0 0 1440 140"
-            preserveAspectRatio="none"
-            style={{ width: "100%", height: "100%" }}
-          >
-            <path
-              d="M0,80 C360,20 1080,120 1440,60 L1440,0 L0,0 Z"
-              fill="#e4c56a"
-            />
-          </svg>
-        </Box>
-
-        <Container maxW="7xl" position={"relative"} zIndex={"10000"}>
-          <VStack spacing={10}>
-            <VStack>
-              <Heading mt={".1em"}>Our Most Popular Meals</Heading>
-              <Text color="gray.600">
-                Delicious and healthy meals loved by our customers.
+      {/* ── MEALS (Dynamic) ── */}
+      <Box id="meals" py={24} position="relative" bg="#fbfaf7">
+        <Wave d="M0,80 C360,20 1080,120 1440,60 L1440,0 L0,0 Z" fill="#e4c56a" position="top" height="120px" />
+        
+        <Container maxW="7xl" position="relative" zIndex={10}>
+          <VStack spacing={12}>
+            <VStack spacing={3} textAlign="center">
+              <Heading size="2xl">Explore Our World Menu</Heading>
+              <Text color="gray.600" fontSize="lg" maxW="2xl">
+                Discover a variety of healthy, fresh meals from across the globe.
               </Text>
             </VStack>
 
-            {/* Popular meals - always visible */}
-            <SimpleGrid columns={{ base: 1, md: 4 }} spacing={8}>
-              {[
-                {
-                  title: "Grilled Chicken Bowl",
-                  content:
-                    "Grilled chicken, brown rice, broccoli, cherry tomatoes, and avocado",
-                  price: "$12.99",
-                  img: "https://images.unsplash.com/photo-1504674900247-0877df9cc836?crop=entropy&cs=tinysrgb&fit=crop&w=400&h=400&q=80",
-                },
-                {
-                  title: "Salmon & Quinoa",
-                  content:
-                    "Roasted salmon, quinoa, asparagus and mixed greens.",
-                  price: "$13.99",
-                  img: "https://images.unsplash.com/photo-1551183053-bf91a1d81141?crop=entropy&cs=tinysrgb&fit=crop&w=400&h=400&q=80",
-                },
-                {
-                  title: "Vegan Buddha Bowl",
-                  content:
-                    "Chickpea, quinoa, avocado, sweet potatoes, and mixed veggies",
-                  price: "$11.99",
-                  img: "https://donutfollowthecrowd.com/wp-content/uploads/2024/12/Sweet-Potato-Quinoa-Bowl3.jpg",
-                },
-                {
-                  title: "Turkey & Sweet Potato",
-                  content:
-                    "Lean ground turkey, roasted sweet potatoes, and green beans",
-                  price: "$11.99",
-                  img: "https://images.unsplash.com/photo-1600891964599-f61ba0e24092?crop=entropy&cs=tinysrgb&fit=crop&w=400&h=400&q=80",
-                },
-              ].map((meal) => (
-                <Box
-                  key={meal.title}
+            {/* Filter and Shuffle Controls */}
+            <VStack spacing={8} w="full">
+              <Flex w="full" align="center" justify="center" direction={{ base: "column", md: "row" }} gap={4}>
+                <CategoryFilter active={activeCategory} onChange={setActiveCategory} isDisabled={loading} />
+                <IconButton
+                  aria-label="Refresh Menu"
+                  icon={<FaSyncAlt style={{ animation: isRefreshing ? "spin 1s linear infinite" : "none" }} />}
+                  onClick={handleRefresh}
+                  isLoading={isRefreshing}
+                  rounded="full"
                   bg="white"
-                  rounded="2xl"
-                  shadow="md"
-                  p={4}
-                >
-                  <Image
-                    src={meal.img}
-                    alt={meal.title}
-                    rounded="2xl"
-                    w="100%"
-                    h="200px"
-                    objectFit="cover"
-                    mb={3}
-                  />
-                  <Heading size="md" textAlign="center" mb={2}>
-                    {meal.title}
-                  </Heading>
-                  <Text fontWeight="normal" mb={3} noOfLines={2}>
-                    {meal.content}
-                  </Text>
-                  <Text fontWeight="bold" mb={3}>
-                    {meal.price}
-                  </Text>
-                  <Button w="full" bg="#f2b233" color="white" rounded="full">
-                    Order Now
-                  </Button>
-                </Box>
-              ))}
+                  shadow="sm"
+                  color="#6b8f3f"
+                  _hover={{ bg: "#f0f7e8" }}
+                  ml={{ md: 4 }}
+                />
+              </Flex>
+            </VStack>
+
+            {/* Meals Display */}
+            <SimpleGrid columns={{ base: 1, sm: 2, lg: 4 }} spacing={10} w="100%">
+              {loading
+                ? Array(8).fill(0).map((_, i) => <MealSkeleton key={i} />)
+                : meals.map((meal, index) => <MealCard key={meal._id || index} {...meal} />)
+              }
             </SimpleGrid>
 
-            {/* Toggle section for full menu */}
-            <Collapse in={isOpen} animateOpacity>
-              <VStack spacing={10} mt={12}>
-                <SimpleGrid columns={{ base: 1, md: 4 }} spacing={8}>
-                  {[
-                    {
-                      title: "Shrimp Avocado Bowl",
-                      content:
-                        "Grilled shrimp, avocado, cucumber, edamame, and sesame dressing",
-                      price: "$14.49",
-                      img: "https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?crop=entropy&cs=tinysrgb&fit=crop&w=400&h=400&q=80",
-                    },
-                    {
-                      title: "Beef Stir-Fry Bowl",
-                      content:
-                        "Lean beef, bell peppers, broccoli, carrots, and brown rice",
-                      price: "$13.49",
-                      img: "https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?crop=entropy&cs=tinysrgb&fit=crop&w=400&h=400&q=80",
-                    },
-                    {
-                      title: "Mediterranean Falafel Bowl",
-                      content:
-                        "Falafel, hummus, tabbouleh, feta, olives, and tahini",
-                      price: "$12.49",
-                      img: "https://images.unsplash.com/photo-1540189549336-e6e99c3679fe?crop=entropy&cs=tinysrgb&fit=crop&w=400&h=400&q=80",
-                    },
-                    {
-                      title: "Tofu Veggie Power Bowl",
-                      content:
-                        "Crispy tofu, kale, roasted beets, quinoa, and lemon tahini",
-                      price: "$11.49",
-                      img: "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?crop=entropy&cs=tinysrgb&fit=crop&w=400&h=400&q=80",
-                    },
-                  ].map((meal) => (
-                    <Box
-                      key={meal.title}
-                      bg="white"
-                      rounded="2xl"
-                      shadow="md"
-                      p={4}
-                    >
-                      <Image
-                        src={meal.img}
-                        alt={meal.title}
-                        rounded="2xl"
-                        w="100%"
-                        h="200px"
-                        objectFit="cover"
-                        mb={3}
-                      />
-                      <Heading size="md" textAlign="center" mb={2}>
-                        {meal.title}
-                      </Heading>
-                      <Text fontWeight="normal" mb={3} noOfLines={2}>
-                        {meal.content}
-                      </Text>
-                      <Text fontWeight="bold" mb={3}>
-                        {meal.price}
-                      </Text>
-                      <Button
-                        w="full"
-                        bg="#f2b233"
-                        color="white"
-                        rounded="full"
-                      >
-                        Order Now
-                      </Button>
-                    </Box>
-                  ))}
-                </SimpleGrid>
+            {/* Empty State */}
+            {!loading && meals.length === 0 && (
+              <VStack py={20} spacing={6}>
+                <Icon as={FaLeaf} boxSize={16} color="gray.200" />
+                <Text color="gray.500" fontSize="xl" fontWeight="medium">No meals found in this category.</Text>
+                <Button variant="outline" borderColor="#6b8f3f" color="#6b8f3f" onClick={() => setActiveCategory("all")}>
+                  Clear Filters
+                </Button>
               </VStack>
-            </Collapse>
-            <Box
-              position="absolute"
-              bottom={0}
-              left={0}
-              w="100%"
-              h={{ base: "80px", md: "150px" }}
-              overflow="hidden"
-              pointerEvents="none"
-              zIndex={1}
-            >
-              <svg
-                viewBox="0 0 1440 140"
-                preserveAspectRatio="none"
-                style={{ width: "100%", height: "100%" }}
-              >
-                <path
-                  d="M0,60 C360,120 1080,0 1440,70 L1440,140 L0,140 Z"
-                  fill="#e4c56a"
-                />
-              </svg>
-            </Box>
+            )}
 
-            {/* The toggle button */}
-            <Button
-              position={"relative"}
-              bg="#6b8f3f"
-              color="white"
-              rounded="full"
-              mt={"-0.1em"}
-              px={10}
-              size="lg"
-              zIndex={"10000"}
-              onClick={onToggle}
-            >
-              {isOpen ? "Hide Full Menu" : "View Full Menu"}
-            </Button>
+            {!loading && meals.length > 0 && (
+              <Button
+                bg="#6b8f3f"
+                color="white"
+                rounded="full"
+                px={12}
+                py={7}
+                fontSize="lg"
+                onClick={onToggle}
+                _hover={{ bg: "#5a7a34", transform: "translateY(-2px)", shadow: "lg" }}
+              >
+                {isOpen ? "Show Less" : "View Full Menu"}
+              </Button>
+            )}
           </VStack>
         </Container>
+
+        <Wave
+          d="M0,60 C360,120 1080,0 1440,70 L1440,140 L0,140 Z"
+          fill="#e4c56a"
+          height="140px"
+        />
       </Box>
+
       <Footer />
     </Box>
   );
